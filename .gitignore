@@ -1,0 +1,7 @@
+# Local artifacts
+*.pt
+*.tar.gz
+
+# Python/Jupyter
+__pycache__/
+.ipynb_checkpoints/

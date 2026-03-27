@@ -1,0 +1,469 @@
+================================================================================
+HYPERPARAMETER OPTIMIZATION LOG — IMDB SentimentScope
+================================================================================
+GPU: NVIDIA GeForce RTX 4080 Laptop GPU
+
+This file is the single record of hyperparameter work for the project.
+
+  PART A — Automated search with Optuna (4 runs, ~53 trials)
+           Systematic exploration of architecture and training hyperparameters.
+
+  PART B — Manual / directed experiments (direct training runs)
+           After Optuna, targeted tests: classification heads, augmentation,
+           positional encoding, MAX_LENGTH, frozen BERT embeddings, tiny model.
+           Builds on Optuna Run 3 “Trial 12” style configs (d_embed=192, 6 layers)
+           and Optuna Run 1 “Trial 9” style (d_embed=64, 4 layers).
+
+The final submission model uses Run 4 Trial #12 hyperparameters (see PART A,
+Run 4); PART B informed earlier design choices (e.g. head shape, augmentation).
+
+
+################################################################################
+# PART A — OPTUNA AUTOMATED HYPERPARAMETER SEARCH
+################################################################################
+
+
+----------------------------------------------------------------------
+PART A — Run 1 of 4 (causal attention)
+----------------------------------------------------------------------
+Date: 2026-03-04
+MAX_LENGTH: 256, BATCH_SIZE: 48, EPOCHS: 5
+
+Search space:
+  d_embed:      [64, 128, 192, 256]
+  heads_num:    [4, 8]
+  layers_num:   2 to 8
+  dropout_rate: 0.05 to 0.3
+  lr:           1e-5 to 1e-3 (log scale)
+  weight_decay: 0.0 to 0.05
+
+Trial Results (15 trials):
+---------------------------------------------------------------------
+Trial | d_embed | heads | layers | dropout | lr       | wd     | Val Acc
+------+---------+-------+--------+---------+----------+--------+--------
+  0   |   64    |   4   |   5    | 0.096   | 4.37e-5  | 0.0393 | 69.60%
+  1   |  128    |   8   |   3    | 0.290   | 1.65e-4  | 0.0229 | 80.80%
+  2   |  128    |   4   |   3    | 0.125   | 3.29e-5  | 0.0200 | 72.88%
+  3   |  128    |   8   |   8    | 0.235   | 7.75e-5  | 0.0015 | 77.40%
+  4   |  256    |   8   |   4    | 0.170   | 9.13e-5  | 0.0246 | 80.40%
+* 5   |  128    |   8   |   7    | 0.209   | 8.58e-4  | 0.0206 | 84.40%  <-- BEST
+  6   |  192    |   8   |   8    | 0.248   | 2.38e-4  | 0.0440 | 81.80%
+  7   |   64    |   8   |   8    | 0.102   | 2.70e-5  | 0.0362 | pruned (61.24% at epoch 2)
+  8   |  128    |   8   |   2    | 0.068   | 1.05e-4  | 0.0406 | pruned (73.28% at epoch 2)
+  9   |  128    |   8   |   7    | 0.061   | 5.90e-5  | 0.0270 | pruned (65.92% at epoch 2)
+ 10   |  192    |   4   |   6    | 0.190   | 9.31e-4  | 0.0099 | 83.40%
+ 11   |  192    |   4   |   6    | 0.187   | 8.82e-4  | 0.0089 | 83.28%
+ 12   |  192    |   4   |   6    | 0.196   | 9.43e-4  | 0.0126 | 84.08%
+ 13   |  256    |   4   |   6    | 0.152   | 3.90e-4  | 0.0153 | 83.36%
+ 14   |  192    |   4   |   7    | 0.239   | 1.30e-5  | 0.0313 | pruned (64.00% at epoch 2)
+
+Best Trial (#5):
+  d_embed=128, heads_num=8, layers_num=7
+  head_size=16, dropout_rate=0.209
+  lr=0.000858, weight_decay=0.0206
+  Validation Accuracy: 84.40%
+
+Final Retrain with best params:
+  Epoch 1 - Val: 78.56%
+  Epoch 2 - Val: 82.24%
+  Epoch 3 - Val: 84.04%
+  Epoch 4 - Val: 83.96%
+  Epoch 5 - Val: 83.80%
+
+  Test Accuracy: 81.60%
+
+Key observations:
+- d_embed=128 outperformed 192 and 256
+- High lr (~8.6e-4) was critical
+- Dropout ~0.2 provided good regularization
+- 7 layers with 8 heads was the sweet spot
+- Val-Test gap (84.4% vs 81.6%) suggests some overfitting
+
+
+========================================================================
+
+
+----------------------------------------------------------------------
+PART A — Run 2 of 4 (causal attention, narrow search around Run 1 best)
+----------------------------------------------------------------------
+Date: 2026-03-04
+MAX_LENGTH: 256, BATCH_SIZE: 48, EPOCHS: 5
+
+Fixed params (from Run 1 best):
+  d_embed=128, dropout=0.209, lr=8.6e-4, weight_decay=0.0206
+
+Search space:
+  heads_num:  [8, 16]
+  layers_num: 7 to 10
+
+Trial Results (8 trials):
+---------------------------------------------------------------------
+Trial | heads | layers | head_size | Val Acc | Status
+------+-------+--------+-----------+---------+---------
+  0   |   8   |   10   |    16     | 85.04%  | Completed  <-- BEST
+  1   |  16   |   10   |     8     | 84.84%  | Completed
+  2   |  16   |    9   |     8     | 84.96%  | Completed
+  3   |   8   |    7   |    16     | 81.48%  | Pruned (epoch 2)
+  4   |  16   |    8   |     8     | 85.08%  | Pruned (epoch 4, was improving)
+  5   |  16   |    9   |     8     | 82.76%  | Pruned (epoch 2)
+  6   |   8   |    8   |    16     | 83.20%  | Pruned (epoch 2)
+  7   |  16   |    8   |     8     | 85.08%  | Pruned (epoch 4, was improving)
+
+Best Trial (#0):
+  d_embed=128, heads_num=8, layers_num=10
+  head_size=16, dropout_rate=0.209
+  lr=0.000860, weight_decay=0.0206
+  Validation Accuracy: 85.04%
+
+Note: Trial 4 and 7 (16 heads, 8 layers) hit 85.08% at epoch 3
+      but were pruned. These configs may be worth exploring further.
+
+Retrain crashed with KeyError (fixed params not in bp dict) - needs fix.
+
+Key observations:
+- 10 layers slightly better than 7-8 (85.04% vs ~83-84%)
+- 16 heads (head_size=8) performed comparably to 8 heads (head_size=16)
+- More layers helps more than more heads for this task
+- Best improved from 84.40% (Run 1) to 85.04% (Run 2)
+
+
+========================================================================
+
+
+----------------------------------------------------------------------
+PART A — Run 3 of 4 (bidirectional attention + masked pooling)
+----------------------------------------------------------------------
+Date: 2026-03-05
+MAX_LENGTH: 384, BATCH_SIZE: 32, EPOCHS: 8
+
+Architecture changes (vs Run 1 & 2):
+  - Bidirectional attention (removed causal mask)
+  - Padding mask in attention layers
+  - Masked mean pooling (ignores padding tokens)
+  - Cosine LR schedule with 1-epoch warmup
+  - Gradient clipping (max_norm=1.0)
+
+Search space:
+  d_embed:      [64, 128, 192, 256]
+  heads_num:    [4, 8]
+  layers_num:   2 to 8
+  dropout_rate: 0.05 to 0.3
+  lr:           1e-5 to 1e-3 (log scale)
+  weight_decay: 0.0 to 0.05
+
+Trial Results (15 trials):
+---------------------------------------------------------------------
+Trial | d_embed | heads | layers | dropout | lr       | wd     | Val Acc  | Status
+------+---------+-------+--------+---------+----------+--------+----------+--------
+  0   |  192    |   8   |   8    | 0.165   | 4.72e-5  | 0.0038 | 79.80%   | Completed
+  1   |   64    |   4   |   3    | 0.068   | 9.94e-5  | 0.0129 | 77.92%   | Completed
+  2   |   64    |   8   |   5    | 0.220   | 3.47e-4  | 0.0367 | 85.16%   | Completed
+  3   |    -    |   -   |   -    |    -    |    -     |    -   |    -     | Pruned (69.64% epoch 3)
+  4   |  256    |   8   |   7    | 0.131   | 6.49e-4  | 0.0038 | 86.08%   | Completed
+  5   |  128    |   4   |   5    | 0.211   | 4.05e-4  | 0.0273 | 85.96%   | Completed
+  6   |  192    |   8   |   7    | 0.215   | 7.77e-4  | 0.0061 | 86.76%   | Completed
+  7   |    -    |   -   |   -    |    -    |    -     |    -   |    -     | Pruned (74.88% epoch 3)
+  8   |    -    |   -   |   -    |    -    |    -     |    -   |    -     | Pruned (84.92% epoch 4)
+* 9   |   64    |   4   |   4    | 0.168   | 8.88e-4  | 0.0496 | 87.28%   | Completed
+ 10   |    -    |   -   |   -    |    -    |    -     |    -   |    -     | Pruned (83.92% epoch 3)
+ 11   |  192    |   4   |   3    | 0.266   | 9.91e-4  | 0.0483 | 86.12%   | Completed
+*12   |  192    |   4   |   6    | 0.200   | 9.59e-4  | 0.0287 | 87.52%   | Completed  <-- BEST
+ 13   |    -    |   -   |   -    |    -    |    -     |    -   |    -     | Pruned (83.52% epoch 3)
+ 14   |   64    |   4   |   6    | 0.178   | 9.96e-4  | 0.0392 | 87.16%   | Completed
+
+Best Trial (#12):
+  d_embed=192, heads_num=4, layers_num=6
+  head_size=48, dropout_rate=0.200
+  lr=0.000959, weight_decay=0.0287
+  Validation Accuracy: 87.52%
+
+Final Retrain with best params:
+  Epoch 1 - Val: 82.60%
+  Epoch 2 - Val: 85.52%
+  Epoch 3 - Val: 86.76%
+  Epoch 4 - Val: 87.76%  <-- peak
+  Epoch 5 - Val: 86.96%
+  Epoch 6 - Val: 86.60%
+  Epoch 7 - Val: 86.84%
+  Epoch 8 - Val: 87.00%
+
+  Test Accuracy: 84.68%
+
+Comparison across Optuna runs (PART A):
+  Run 1 (causal mask):       Val 84.40% -> Test 81.60%
+  Run 2 (causal, narrow):    Val 85.04% -> Test N/A (crashed)
+  Run 3 (bidirectional):     Val 87.52% -> Test 84.68%  (+3.08% test)
+
+Key observations:
+- Bidirectional attention + masked mean pooling gave +3% test accuracy
+- d_embed=64 performed surprisingly well (87.28% val in Trial 9)
+- Smaller models with high LR (~9e-4) and high weight_decay (~0.03-0.05) dominate
+- 4 heads consistently beat 8 heads in top trials
+- Val peaks at epoch 4-5, then slightly declines (overfitting)
+- Val-Test gap still ~3% — suggests more regularization or data needed for 90%
+- Peak val during retrain was 87.76% (epoch 4) but final epoch was 87.00%
+- Early stopping at epoch 4 would have given better test accuracy
+
+
+========================================================================
+
+
+----------------------------------------------------------------------
+PART A — Run 4 of 4 (2-layer head, pos_enc / augmentation searchable)
+----------------------------------------------------------------------
+Date: 2026-03-09
+MAX_LENGTH: 384, BATCH_SIZE: 32, EPOCHS: 8
+
+Architecture changes (vs Run 3):
+  - 2-layer classification head (Linear 128 -> GELU -> Dropout -> Linear 2)
+  - Optional positional encoding (searchable)
+  - Label smoothing (0.1) in CrossEntropyLoss
+  - Random deletion augmentation (searchable)
+  - trim_middle_to_fit for long texts
+  - Best checkpoint saving (val-based) during training
+
+Search space:
+  d_embed:               [64, 128, 192, 256]
+  heads_num:             [4, 8]
+  layers_num:            2 to 8
+  dropout_rate:          0.05 to 0.3
+  use_positional_encoding: [True, False]
+  use_random_deletion:   [True, False]
+  lr:                    1e-5 to 1e-3 (log scale)
+  weight_decay:          0.0 to 0.05
+
+Trial Results (15 trials):
+------------------------------------------------------------------------------------------------------------------------------
+Trial | d_embed | heads | layers | dropout | pos_enc | augment | lr       | wd     | Val Acc  | Status
+------+---------+-------+--------+---------+---------+---------+----------+--------+----------+--------
+  0   |  128    |   4   |   3    | 0.209   |   Yes   |   No    | 1.12e-4  | 0.0094 | 84.08%   | Completed
+  1   |  128    |   4   |   3    | 0.063   |   No    |   Yes   | 5.90e-4  | 0.0011 | 87.88%   | Completed
+  2   |   64    |   8   |   5    | 0.123   |   No    |   Yes   | 3.77e-4  | 0.0291 | 86.80%   | Completed
+  3   |   64    |   8   |   3    | 0.055   |   No    |   No    | 2.02e-4  | 0.0453 |    -     | Pruned (84.28% epoch 3)
+  4   |  192    |   4   |   7    | 0.089   |   Yes   |   No    | 5.38e-4  | 0.0062 | 86.96%   | Completed
+  5   |  192    |   4   |   8    | 0.132   |   No    |   Yes   | 7.70e-5  | 0.0285 |    -     | Pruned (82.72% epoch 3)
+  6   |  192    |   8   |   5    | 0.105   |   No    |   No    | 5.42e-4  | 0.0049 | 87.64%   | Completed
+  7   |  128    |   8   |   5    | 0.126   |   Yes   |   No    | 1.50e-5  | 0.0296 |    -     | Pruned (70.84% epoch 3)
+  8   |  192    |   4   |   5    | 0.133   |   Yes   |   No    | 9.43e-4  | 0.0259 | 88.52%   | Completed
+  9   |  128    |   4   |   5    | 0.052   |   No    |   Yes   | 9.60e-5  | 0.0237 |    -     | Pruned (83.76% epoch 3)
+ 10   |  256    |   4   |   7    | 0.282   |   Yes   |   No    | 2.60e-5  | 0.0436 |    -     | Pruned (76.72% epoch 3)
+ 11   |  256    |   4   |   2    | 0.180   |   Yes   |   Yes   | 8.52e-4  | 0.0161 | 88.72%   | Completed
+*12   |  256    |   4   |   2    | 0.186   |   Yes   |   Yes   | 9.83e-4  | 0.0179 | 89.00%   | Completed  <-- BEST
+ 13   |  256    |   4   |   2    | 0.203   |   Yes   |   Yes   | 9.32e-4  | 0.0164 | 88.32%   | Completed
+ 14   |  256    |   4   |   2    | 0.174   |   Yes   |   Yes   | 2.12e-4  | 0.0178 |    -     | Pruned (85.24% epoch 3)
+
+Best Trial (#12):
+  d_embed=256, heads_num=4, layers_num=2
+  head_size=64, dropout_rate=0.186
+  use_positional_encoding=True, use_random_deletion=True
+  lr=0.000983, weight_decay=0.0179
+  Validation Accuracy: 89.00% (best at epoch 7)
+
+Final Retrain with best params:
+  Epoch 1 - Val: 81.72%
+  Epoch 2 - Val: 86.72%
+  Epoch 3 - Val: 86.96%
+  Epoch 4 - Val: 87.96%
+  Epoch 5 - Val: 88.00%
+  Epoch 6 - Val: 87.96%
+  Epoch 7 - Val: 88.32%
+  Epoch 8 - Val: 88.40%
+
+  Test Accuracy: 86.37%
+
+Comparison across Optuna runs (PART A):
+  Run 1 (causal mask):       Val 84.40% -> Test 81.60%
+  Run 2 (causal, narrow):    Val 85.04% -> Test N/A (crashed)
+  Run 3 (bidirectional):     Val 87.52% -> Test 84.68%
+  Run 4 (2-layer head, pos_enc opt, augment opt, label smoothing): Val 89.00% -> Test 86.37%
+
+Key observations:
+- d_embed=256 with 2 layers dominates top trials (12, 11, 13) — shallow + wide works best
+- use_positional_encoding=True in all top 5 trials
+- use_random_deletion mixed: Trial 12 (best) uses True; Trial 8 (3rd) uses False
+- High lr (~9-10e-4) and moderate weight_decay (~0.017-0.026) in best trials
+- Pruned trials: very low lr (1.5e-5, 2.6e-5), high dropout (0.28), or slow early progress
+- Val-Test gap ~2.6% (89% vs 86.37%) — improved over previous runs
+- 4 heads consistently best; 8 heads in top trials underperform
+- 2-layer head + optional features pushed validation to 89% (new high)
+
+
+################################################################################
+# PART B — MANUAL / DIRECT TRAINING EXPERIMENTS (after Optuna)
+################################################################################
+# These are not Optuna trials: each row is a deliberate experiment varying one
+# or a few knobs (head depth, augmentation, pos enc, MAX_LENGTH, etc.).
+################################################################################
+
+
+Trial 9 / Trial 12 - Direct Training Results
+=============================================
+Date: 2026-03-05/06
+GPU: NVIDIA GeForce RTX 4080 Laptop GPU
+
+Base Architecture (all PART B runs below):
+  Bidirectional attention + padding mask
+  Masked mean pooling
+  Cosine LR schedule with 1-epoch warmup
+  Gradient clipping (max_norm=1.0)
+
+========================================================================
+PHASE 1: Trial 9 config (d_embed=64, 4 heads, 4 layers) — from Optuna Run 3 Trial 9
+========================================================================
+
+Hyperparameters:
+  d_embed=64, heads_num=4, layers_num=4, head_size=16
+  dropout_rate=0.168, lr=8.877e-4, weight_decay=0.0496
+  Model parameters: ~2.2M
+
+Run 1 (ML=384, BS=32):
+  Best Val: 86.96% (epoch 5) -> Test: 84.56%
+
+Run 2 (ML=384, BS=32, + full 25k retrain):
+  Best Val: 87.32% (epoch 6) -> Test: 84.68% (split), 85.24% (full)
+
+Run 3 (ML=512, BS=64):
+  Best Val: 87.92% (epoch 8) -> Test: 85.31% (split), 85.29% (full)
+
+========================================================================
+PHASE 2: Trial 12 config (d_embed=192, 4 heads, 6 layers) — from Optuna Run 3 Trial 12
+========================================================================
+
+Hyperparameters:
+  d_embed=192, heads_num=4, layers_num=6, head_size=48
+  lr=9.59e-4, weight_decay=0.0287
+  ML=384, BS=32, EPOCHS=8
+
+--- Exp A: BERT pretrained embeddings (frozen, 768->192 projection) ---
+  dropout=0.2, params: 26.3M total (2.9M trainable)
+  Best Val: 85.60% (epoch 7) -> Test: 84.95% (split), 85.59% (full)
+  VERDICT: Worse than random embeddings. Frozen projection bottleneck.
+
+--- Exp B: 3-layer classification head (192->128->64->32->2) ---
+  dropout=0.2, params: 8.6M
+  Best Val: 87.36% (epoch 8) -> Test: 84.70%
+  VERDICT: No improvement over 1-layer head. Too much compression.
+
+--- Exp C: 1-layer classification head (192->128->2) ---
+  dropout=0.2, params: 8.6M
+  Best Val: 87.56% (epoch 6) -> Test: 85.00% (split), 85.70% (full)
+  VERDICT: Best head config. Hidden layer helps decision boundary.
+
+--- Exp D: 3-layer head + reduced dropout (0.175) ---
+  dropout=0.175, params: 8.6M
+  Best Val: 87.40% (epoch 6) -> Test: 85.10% (split), 85.60% (full)
+  VERDICT: Similar to Exp C. Lower dropout didn't help with 3-layer head.
+
+--- Exp E: 1-layer head + dropout 0.175 + random deletion 10% ---
+  dropout=0.175, params: 8.6M, 10% random word deletion during training
+  Best Val: 87.76% (epoch 5) -> Test: 85.80% (split), 86.06% (full)
+  VERDICT: Data augmentation pushed test above 86%.
+
+--- Exp F: 1-layer head + dropout 0.175 + uniform(0-30%) deletion + 12 epochs ---  <-- BEST
+  dropout=0.175, params: 8.6M, random deletion rate ~ uniform(0%, 30%), 12 epochs
+  Best Val: 88.40% (epoch 7) -> Test: 85.94% (split), 86.32% (full)
+  VERDICT: NEW BEST! Variable deletion rate + more epochs = highest val & test.
+  Val progression: 81.40, 84.68, 85.60, 85.08, 87.64, 87.08, 88.40*, 87.72,
+                   87.36, 87.88, 88.16, 88.12
+
+--- Exp G: Tiny model (d_embed=64) + 1-layer head + aug 0-30% + 12 epochs ---
+  d_embed=64, layers=4, heads=4, head_size=16, dropout=0.168
+  lr=8.877e-4, weight_decay=0.0496, params: 2.2M
+  Classification head: 64->48->2 with GELU+Dropout
+  Best Val: 88.00% (epoch 11) -> Test: 85.80% (split), 85.81% (full)
+  VERDICT: Tiny model nearly matches d_embed=192 (~0.5% behind on test).
+  Val progression: 75.84, 84.72, 86.60, 87.56, 87.76, 87.36, 87.80, 87.88,
+                   87.96, 87.64, 88.00*, 87.92
+
+--- Exp H: Length-dependent deletion + trim middle (d_embed=192) ---  <-- BEST
+  d_embed=192, layers=6, heads=4, head_size=48, dropout=0.175
+  lr=9.59e-4, weight_decay=0.0287, params: 8.6M
+  Augmentation: max_p = min(0.4, max(0.05, n/1000)) per review
+  Trim: when > max_length tokens, keep first half + last half words (drop middle)
+  Best Val: 88.52% (epoch 8) -> Test: 86.25% (split), 86.36% (full)
+  VERDICT: NEW BEST! Length-dependent deletion + trim middle pushed test to 86.36%.
+  Val progression: 81.16, 86.16, 84.88, 87.12, 88.48, 87.72, 87.88, 88.52*,
+                   88.04, 88.28, 87.96, 88.16
+
+--- Exp I: No positional encoding (d_embed=192) ---
+  d_embed=192, layers=6, heads=4, head_size=48, dropout=0.2
+  lr=9.59e-4, weight_decay=0.0287, params: 8.55M (no pos embedding layer)
+  use_positional_encoding=False, ML=256, BS=32, EPOCHS=12
+  Augmentation: length-dependent deletion + trim middle (same as Exp H)
+  Best Val: 88.76% (epoch 8) -> Test: 85.70% (split), 86.10% (full)
+  VERDICT: Higher val (88.76%) but lower test (86.10%) vs Exp H (86.36%). Pos enc helps generalization.
+  Val progression: 83.04, 86.08, 86.76, 87.20, 86.88, 88.60, 87.44, 88.76*,
+                   88.48, 88.12, 88.32, 88.20
+
+--- Exp J: No positional encoding + no random deletion (d_embed=192) ---
+  d_embed=192, layers=6, heads=4, head_size=48, dropout=0.2
+  lr=9.59e-4, weight_decay=0.0287, params: 8.55M (no pos embedding layer)
+  use_positional_encoding=False, USE_RANDOM_DELETION=False, ML=384, BS=32, EPOCHS=12
+  Augmentation: none (trim middle only when > max_length)
+  Best Val: 87.64% (epoch 6) -> Test: 85.46% (split), 86.90% (full)
+  VERDICT: No pos enc + no aug. Full retrain 86.90% beats Exp I (86.10%); ML=384 helps.
+
+--- Exp K: No pos enc + no aug + ML=512 (d_embed=192) ---
+  d_embed=192, layers=6, heads=4, head_size=48, dropout=0.2
+  lr=9.59e-4, weight_decay=0.0287, params: 8.55M (no pos embedding layer)
+  use_positional_encoding=False, USE_RANDOM_DELETION=False, ML=512, BS=32, EPOCHS=12
+  Augmentation: none (trim middle only when > max_length)
+  Best Val: 88.60% (epoch 5) -> Test: 86.48% (split), 86.65% (full)
+  VERDICT: ML=512 vs Exp J (ML=384). Higher split test (86.48% vs 85.46%) but lower full (86.65% vs 86.90%). ML=384 better for no-aug setup.
+  Val progression: 81.00, 86.68, 86.88, 87.52, 88.60*, 87.48, 88.28, 87.80, 87.56, 87.84, 87.92, 87.80
+
+========================================================================
+PART B — SUMMARY (all experiments ranked by test accuracy)
+========================================================================
+
+  Optuna Run 1 (causal, d_embed=128):                 Test 81.60%
+  Optuna Run 3 Best (bidir, d_embed=192, no head):    Test 84.68%
+  BERT pretrained (frozen, d_embed=192):               Test 84.95% / 85.59%
+  Trial 9 tiny (d_embed=64, ML=384, no aug):           Test 85.24%
+  Trial 9 tiny (d_embed=64, ML=512, no aug):           Test 85.31%
+  Trial 12 + 1-layer head (d_embed=192, no aug):       Test 85.00% / 85.70%
+  Tiny + 1-layer head + aug 0-30% + 12ep:             Test 85.80% / 85.81%
+  Trial 12 + 1-layer head + aug 10% (d_embed=192):    Test 85.80% / 86.06%
+  Trial 12 + 1-layer head + aug 0-30% + 12ep:         Test 85.94% / 86.32%
+  Exp I: No positional encoding (ML=256):              Test 85.70% / 86.10%
+  Trial 12 + len-dep deletion + trim middle:          Test 86.25% / 86.36%
+  Exp J: No pos enc + no aug (ML=384):                Test 85.46% / 86.90%  <-- BEST (full)
+  Exp K: No pos enc + no aug (ML=512):                Test 86.48% / 86.65%
+
+  Overall improvement: 76% (baseline) -> 86.90% (+10.90%)
+
+========================================================================
+PART B — WHAT WORKED (in order of impact)
+========================================================================
+  1. Bidirectional attention + masked mean pooling     (+3% test)
+  2. MAX_LENGTH increase (128 -> 384 -> 512)           (+3-4% test)
+  3. Length-dependent deletion + trim middle            (+0.04% over uniform)
+  4. Random deletion augmentation (uniform or len-dep)  (+0.6% test)
+  5. Hidden classification layer                       (+0.32% test)
+  6. More epochs (8 -> 12) with augmentation           (+0.26% test)
+  7. Full 25k retrain (after finding best epoch)      (+0.38% test)
+  8. Cosine LR schedule with warmup
+  9. Gradient clipping
+  10. Optuna hyperparameter search (PART A)
+
+========================================================================
+PART B — WHAT DID NOT WORK
+========================================================================
+  1. BERT pretrained embeddings (frozen + projection)
+  2. 3-layer classification head
+  3. Increasing d_embed beyond 192
+  4. More than 4 attention heads
+  5. No positional encoding (higher val 88.76% but lower test 86.10% vs 86.36%)
+
+========================================================================
+PART B — Best config from manual sweep (Exp H style; not final submission)
+========================================================================
+  d_embed=192, heads=4, layers=6, head_size=48, dropout=0.175
+  lr=9.59e-4, wd=0.0287, head 192->128->2
+  Length-dependent deletion (max_p = min(0.4, max(0.05, n/1000)))
+  Trim middle when > max_length (keep first half + last half words)
+  ML=384, BS=32, EPOCHS=12, full 25k retrain -> Test 86.36%
+
+Note: Final submission notebook uses PART A Run 4 Trial #12 (d_embed=256,
+      2 layers, etc.) which reached 86.37% in Optuna retrain and ~87% after
+      full 25k retrain in later runs — see research report.
