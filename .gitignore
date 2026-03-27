@@ -1,6 +1,8 @@
-# Local artifacts
+# Local artifacts (include aclImdb_v1.tar.gz in Udacity zip; do not commit)
 *.pt
 *.tar.gz
+*.gz
+aclImdb/
 
 # Python/Jupyter
 __pycache__/

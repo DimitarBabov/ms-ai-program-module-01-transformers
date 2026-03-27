@@ -10,7 +10,7 @@ IMDB binary sentiment classification using custom transformer models.
 | `SentimentScope_bert_like.ipynb` | BERT architecture + pretrained weights (~109M params, ~93.6% test accuracy). Saves `demogpt_bertlike.pt` locally during training. |
 | `SentimentScope_Research_Report.md` | Full research report documenting the optimization journey |
 | `hyperparameter_optimization_log.txt` | Raw logs from Optuna (Part A) and manual experiments (Part B) |
-| `aclImdb/` | Extracted dataset (train/test, pos/neg) |
+| `aclImdb_v1.tar.gz` | IMDB archive (add to your Udacity zip; not tracked in git). First notebook cells extract to `aclImdb/` when missing. |
 | `requirements.txt` | Python dependencies |
 
 ## Setup
@@ -19,7 +19,7 @@ IMDB binary sentiment classification using custom transformer models.
 pip install -r requirements.txt
 ```
 
-This repository already includes `aclImdb/` for direct reproducibility.
+Place `aclImdb_v1.tar.gz` next to the notebooks (e.g. from your course materials). Running the first code cells extracts `aclImdb/` automatically if the folder is not present.
 
 ## Running
 
