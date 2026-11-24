@@ -8,6 +8,7 @@ Files in this folder:
 |---|---|
 | `HOW-TO-PLAY.md` | This file: the rules, the court map and the scoring |
 | `LEVELS.md` | All 100 levels with the machine settings for each one |
+| `level-cards/` + `Level-Cards.pdf` | **A picture card for every level**, drawn like the Proton app, with every setting to enter |
 | `levels.csv` | The same 100 levels as a spreadsheet (handy while programming the machine) |
 | `progress-tracker.csv` | One row per level: best score, stars, date passed |
 | `session-log.csv` | One row per attempt: the full practice diary |
@@ -25,7 +26,12 @@ The machine sits in the **center of the far baseline**. Every level tells you tw
 
 ### Shot spots (player's side): where the machine sends the ball
 
-There are 15 spots: 3 depths × 5 lanes. The Proton also aims at 15 locations, so pick the closest spot in the app.
+There are 15 spots: 3 rows × 5 columns, exactly like the 15 circles in the Proton app. The level cards show the court **the same way the app does**: machine at the bottom, player at the top.
+
+- **D** = back row (top row of circles in the app)
+- **M** = middle row (2nd row)
+- **S** = front row (the row just over the net)
+- Columns are counted **from the left of the app screen**: 1st = FW, 2nd = F, 3rd = C, 4th = B, 5th = BW. The app view is from behind the machine, so the **left of the screen is a right-hander's forehand side**.
 
 ```
                     ======== NET ========
@@ -44,10 +50,10 @@ There are 15 spots: 3 depths × 5 lanes. The Proton also aims at 15 locations, s
 ```
 
 - **Lanes** (shown for a right-hander): BW = wide backhand, B = backhand, C = center/body, F = forehand, FW = wide forehand.
-  **If he's left-handed, swap F and B.**
-- `->` in a level means the machine plays the shots in that order and repeats.
-- `RANDOM:` means you put those shots into one sequence and turn on **randomize** in the Proton app.
-- `(lob)` or `(high)` means put the **lob riser** on and use a high launch angle.
+  **If he's left-handed, tap Mirror** in the app on each program.
+- `->` in a level means the machine plays the shots in that order (**Order: in order**) and repeats.
+- `RANDOM:` means you add those shots to one program and set **Order** to random.
+- `(lob)` or `(high)` means put the **lob riser** on (Riser ON) for that shot.
 
 ### Target zones (machine's side): where his ball must land
 
@@ -93,34 +99,43 @@ The Proton app shows speed and spin in its own numbers. Do a **calibration once*
 
 ### Speed steps
 
-| Step | Meaning | Proton app value (fill in) |
+| Step | Proton app speed | Meaning |
 |---|---|---|
-| **S1** | Easy and comfortable. The ball reaches him about waist high and he can rally it all day | ______ |
-| **S2** | S1 + about 5 km/h (3 mph) | ______ |
-| **S3** | S2 + about 5 km/h | ______ |
-| **S4** | S3 + about 5 km/h. Feels like a real rally against a good junior | ______ |
+| **S1** | **60 km/h** (lowest) | Easy and comfortable |
+| **S2** | **70 km/h** | A bit quicker |
+| **S3** | **80 km/h** | Normal rally pace |
+| **S4** | **90 km/h** | Match pace for a good junior |
 
-To find S1, start at the slowest setting and go up until the ball lands nicely in the **M** row. If S3 or S4 later turns out too hard or too easy, adjust them, update this table, and keep the same steps for every level.
+If a step is too hard or too easy for him, move all levels that use it by one slider notch, and write the change here so you stay consistent.
 
 ### Spin
 
-| Name | Meaning | Proton app value (fill in) |
+| Name | Proton app spin | Meaning |
 |---|---|---|
-| **Flat** | no spin | ______ |
-| **Top 1** | light topspin | ______ |
-| **Top 2** | medium topspin, bounces up a bit | ______ |
-| **Top 3** | heavy topspin, high kick | ______ |
-| **Slice 1** | light backspin, stays low | ______ |
+| **Flat** | 0 rpm | no spin |
+| **Top 1** | +500 rpm topspin | light topspin |
+| **Top 2** | +1000 rpm topspin | medium, bounces up a bit |
+| **Top 3** | +2000 rpm topspin | heavy, high kick |
+| **Slice 1** | −500 rpm backspin | stays low |
 
-"Mixed (per shot)" means each shot in the sequence has its own spin, as written in the Shots column.
+"Mixed (per shot)" means each shot has its own spin. The level card lists the spin for every shot.
 
-### Time between balls
+### Delay
 
-The **Every (s)** column is the number of seconds between balls. If the app uses balls per minute instead, divide 60 by the number of seconds (5 s = 12 balls per minute).
+The **Delay** on each shot is the number of seconds before that ball, the same as the app's Delay slider.
 
 ### Programming the machine
 
-In Proton Control, create a custom sequence for each level and name it exactly like the **Save as** column (`L001`, `L002`, …). You don't need to do all 100 at once. **Program one world (10 levels) at a time**, and do the next world when he gets there. `levels.csv` is the easiest sheet to work from while you do it.
+Open the level's card (`level-cards/L007.png`, or that page of `Level-Cards.pdf`) and copy it into the app:
+
+1. **Programs → Custom →** create a new program named like the card (`L007`).
+2. For each shot on the card: **Add New Shot**, tap the circle shown on the card, then set **Spin**, **Speed** and **Delay** as listed. Turn **Riser** on if the card says so. Then tap **Save Shot**.
+3. Set **Loops** and **Order** as shown on the card's dark bar.
+4. Left-handed? Tap **Mirror**.
+
+Proton location stays **baseline center**, Stand Off. The card's **Balls** number is how many balls count. If loops × shots goes over that, stop the machine after that many balls (the card says so).
+
+You don't need to do all 100 at once. **Program one world (10 levels) at a time**, and do the next world when he gets there.
 
 ---
 
